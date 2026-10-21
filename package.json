@@ -1,0 +1,21 @@
+{
+  "name": "task-manager-p5",
+  "version": "1.0.0",
+  "description": "A full-stack Task Management application built with React, Express, MongoDB, and JWT authentication. Implements Practicals 4 through 8 of the Advanced Web Development Frameworks course.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^18.0.3",
+    "express": "^5.2.1",
+    "mongoose": "^9.10.1"
+  }
+}

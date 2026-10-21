@@ -1,0 +1,99 @@
+# =============================================================================
+# docker-compose.yml — Practical 11: Containerization
+# Task Manager Full-Stack Application
+# =============================================================================
+#
+# Three services:
+#   frontend  — Nginx serving the Vite React build  (host:5173 → container:80)
+#   backend   — Node.js / Express API               (host:5000 → container:5000)
+#   mongodb   — Official MongoDB database            (host:27017 → container:27017)
+#
+# Start everything with:
+#   docker compose up --build
+#
+# Network topology:
+#   Browser → http://localhost:5173 → [frontend container / Nginx]
+#   Browser → http://localhost:5000 → [backend container / Express]
+#   backend  → mongodb:27017        → [mongodb container] (internal DNS)
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # MongoDB — persistent database
+  # ---------------------------------------------------------------------------
+  mongodb:
+    image: mongo:7.0
+    container_name: taskmanager-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"       # Expose on host so local tools (Compass) can connect
+    volumes:
+      - mongodb_data:/data/db   # Named volume → data survives container recreation
+    networks:
+      - app-network
+    healthcheck:
+      # mongosh is included in the mongo:7.0 image
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping').ok", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # Backend — Node.js / Express API
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: taskmanager-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"         # Expose to host so browser can call http://localhost:5000/api
+    environment:
+      # Use the Compose service name 'mongodb' — not localhost — as the DB host.
+      # The actual DB was named 'taskmanager' in the original .env; keep it.
+      MONGO_URI: mongodb://mongodb:27017/taskmanager
+      PORT: 5000
+      NODE_ENV: production
+      # JWT_SECRET is passed from the host environment or a .env file at the
+      # project root.  Set it in a root-level .env file (not committed to git):
+      #   JWT_SECRET=your_actual_secret_here
+      JWT_SECRET: ${JWT_SECRET:-change_this_secret_in_production}
+    depends_on:
+      mongodb:
+        condition: service_healthy   # Wait until MongoDB passes its health check
+    networks:
+      - app-network
+
+  # ---------------------------------------------------------------------------
+  # Frontend — Nginx serving the Vite production build
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: taskmanager-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"           # Host 5173 maps to Nginx's internal port 80
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+# =============================================================================
+# Named volume — MongoDB data persists across container recreation
+# =============================================================================
+volumes:
+  mongodb_data:
+    name: taskmanager_mongodb_data
+
+# =============================================================================
+# Bridge network — isolates app traffic; services discover each other by name
+# =============================================================================
+networks:
+  app-network:
+    driver: bridge
+    name: taskmanager_app_network

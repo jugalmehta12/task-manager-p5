@@ -1,0 +1,25 @@
+# Exclude host-installed dependencies — reinstalled fresh inside the container
+node_modules
+
+# Exclude the local build output — the image builds its own inside Docker
+dist
+
+# Never copy secrets into the image
+.env
+.env.*
+
+# Git and editor artifacts
+.git
+.gitignore
+.github
+
+# Debug logs
+npm-debug.log*
+*.log
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Development performance reports (not needed in the image)
+PRACTICAL8-PERFORMANCE-REPORT.txt

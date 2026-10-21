@@ -1,0 +1,150 @@
+========================================================================
+  AWDF Practical 8: Performance Optimization & Lazy Loading in React
+  Performance Verification Report
+========================================================================
+
+1. WHAT WAS CHANGED
+------------------------------------------------------------------------
+- Installed react-router-dom for client-side routing.
+- Extracted the existing Task Manager UI into pages/Home.jsx (eagerly loaded).
+- Created pages/Projects.jsx and pages/Contact.jsx as separate page components.
+- Converted static imports of Projects and Contact to React.lazy() dynamic imports.
+- Wrapped the <Routes> block with <Suspense fallback={<Loading />}>.
+- Created a Loading.jsx fallback component shown while lazy chunks load.
+- Added navigation links (<Link>) in the header for Home, Projects, Contact.
+- Added minimal CSS for navigation and the loading fallback.
+
+2. FILES MODIFIED
+------------------------------------------------------------------------
+  Modified:
+    src/App.jsx              — Router setup, lazy imports, Suspense wrapper
+    src/index.css            — Added navigation and fallback styles
+
+  Created:
+    src/pages/Home.jsx       — Existing Task Manager logic (moved from App.jsx)
+    src/pages/Projects.jsx   — Lazy-loaded Projects page
+    src/pages/Contact.jsx    — Lazy-loaded Contact page
+    src/components/Loading.jsx — Suspense fallback component
+
+3. KEY CODE CHANGES
+------------------------------------------------------------------------
+
+  App.jsx — Lazy imports:
+    const Projects = lazy(() => import('./pages/Projects.jsx'));
+    const Contact = lazy(() => import('./pages/Contact.jsx'));
+
+  App.jsx — Suspense wrapper:
+    <Suspense fallback={<Loading />}>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/projects" element={<Projects />} />
+        <Route path="/contact" element={<Contact />} />
+      </Routes>
+    </Suspense>
+
+4. BUILD RESULTS
+------------------------------------------------------------------------
+
+  Baseline (before optimization):
+    dist/index.html              0.41 kB   (gzip:  0.27 kB)
+    dist/assets/index-B9aeO3HX.css  2.21 kB   (gzip:  0.84 kB)
+    dist/assets/index-2et5Uqxu.js 145.00 kB  (gzip: 47.18 kB)
+    JS chunks: 1 (single monolithic bundle)
+
+  After optimization:
+    dist/index.html                  0.41 kB   (gzip:  0.27 kB)
+    dist/assets/index-DYw5gYtR.css  2.58 kB   (gzip:  0.94 kB)
+    dist/assets/index-CTIQre5C.js 184.51 kB   (gzip: 60.95 kB)
+    dist/assets/Projects-DuC0ZI3R.js 1.12 kB  (gzip:  0.55 kB)  <-- LAZY CHUNK
+    dist/assets/Contact-DXI0p-9s.js  1.07 kB  (gzip:  0.52 kB)  <-- LAZY CHUNK
+    JS chunks: 3 (main + 2 lazy-loaded route chunks)
+
+  NOTE: The main bundle increased because react-router-dom was added
+  as a new dependency. This is expected — the router code is in the
+  main bundle because all routes depend on it. The lazy-loaded route
+  chunks (Projects: 1.12 kB, Contact: 1.07 kB) are now SEPARATE from
+  the initial load, which is the goal of code splitting.
+
+5. PERFORMANCE COMPARISON TABLE
+------------------------------------------------------------------------
+
+| Metric                   |         Before |           After |
+| ------------------------ | -------------: | --------------: |
+| Initial JS bundle        |    145.00 kB   |    184.51 kB*   |
+| Initial JS transferred   |     47.18 kB   |     60.95 kB*   |
+| Initial load time        |   (measure)    |     (measure)   |
+| Projects route chunk     |  Not separate  |      1.12 kB    |
+| Contact route chunk      |  Not separate  |      1.07 kB    |
+| Total JS on initial load |    145.00 kB   |    184.51 kB    |
+| Total JS (all routes)    |    145.00 kB   |    186.70 kB    |
+
+  * The initial bundle is larger because react-router-dom (~39 kB) is
+    now part of the core bundle (it is required by all routes). This is
+    expected and acceptable — the KEY benefit is that Projects and Contact
+    page code (1.12 kB + 1.07 kB = 2.19 kB) is no longer loaded upfront.
+    For a larger app with complex route components, this savings would be
+    much more significant.
+
+6. CHROME DEVTOOLS VERIFICATION STEPS
+------------------------------------------------------------------------
+
+  To demonstrate the lazy loading optimization:
+
+  Step 1 — Prepare the production build:
+    cd frontend
+    npm run build
+    npm run preview
+    (This serves the built app, typically on http://localhost:4173)
+
+  Step 2 — Open Chrome DevTools → Network tab:
+    a. Press F12 or Ctrl+Shift+I to open DevTools.
+    b. Go to the "Network" tab.
+    c. Check "Disable cache" (to simulate fresh loads).
+    d. Filter by "JS" (click the "JS" filter button).
+
+  Step 3 — Observe initial load:
+    a. Navigate to http://localhost:4173/ (Home page).
+    b. In the Network tab, you will see index-CTIQre5C.js loaded.
+    c. Notice that Projects-DuC0ZI3R.js and Contact-DXI0p-9s.js
+       are NOT loaded yet — they are lazy chunks.
+
+  Step 4 — Navigate to /projects:
+    a. Click the "Projects" link in the navigation.
+    b. In the Network tab, you will see a NEW request appear for
+       Projects-DuC0ZI3R.js (1.12 kB).
+    c. This proves code splitting — the chunk was loaded on demand.
+
+  Step 5 — Navigate to /contact:
+    a. Click the "Contact" link in the navigation.
+    b. In the Network tab, you will see a NEW request appear for
+       Contact-DXI0p-9s.js (1.07 kB).
+    c. Again, code splitting in action.
+
+  Step 6 — Demonstrate Suspense fallback with Slow 3G:
+    a. In DevTools → Network tab, find the throttling dropdown
+       (usually says "No throttling" by default).
+    b. Select "Slow 3G".
+    c. Clear the browser cache (right-click on the page → Reload).
+    d. Click the "Projects" link.
+    e. You will briefly see the fallback UI:
+       "Loading page... Please wait while the page is loading."
+    f. This is the Suspense fallback while the lazy chunk downloads.
+    g. Repeat for the "Contact" link to see it there as well.
+
+  Step 7 — Take screenshots:
+    a. Screenshot: Network tab showing initial load (only index chunk).
+    b. Screenshot: Network tab after clicking Projects (new chunk loads).
+    c. Screenshot: Network tab after clicking Contact (another new chunk).
+    d. Screenshot: Suspense fallback visible on Slow 3G throttling.
+
+7. WARNINGS / NOTES
+------------------------------------------------------------------------
+- The vite:react-babel deprecation warning about `esbuild` is a Vite 8
+  upgrade notice, unrelated to our changes. It does not affect functionality.
+- react-router-dom was installed with --legacy-peer-deps due to a peer
+  dependency conflict with @vitejs/plugin-react. This is safe for this
+  project.
+- All existing Task Manager functionality (CRUD operations, API calls,
+  styling) is preserved. The Home page at "/" works identically.
+
+========================================================================

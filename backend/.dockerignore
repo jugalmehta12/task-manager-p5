@@ -1,0 +1,25 @@
+# Exclude host-installed dependencies — they are reinstalled inside the image
+node_modules
+
+# Never copy secrets or local environment config into the image.
+# Runtime secrets are injected via Docker Compose environment variables.
+.env
+.env.*
+!.env.example
+
+# Git metadata and IDE configs are not needed at runtime
+.git
+.gitignore
+.github
+
+# Development / debug logs
+npm-debug.log*
+*.log
+
+# Local build output (not needed; image builds its own)
+dist
+coverage
+
+# Editor and OS artifacts
+.DS_Store
+Thumbs.db
