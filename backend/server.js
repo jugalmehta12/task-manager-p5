@@ -40,19 +40,25 @@ app.use((req, res) => {
 // Global error handler — must be LAST
 app.use(errorHandler);
 
-// Connect to MongoDB, then start the server
-const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/taskmanager';
+// Expose the app so tests can exercise HTTP routes without opening a port or
+// connecting to MongoDB. This is safe for the production entry point too.
+module.exports = app;
 
-mongoose
-  .connect(MONGO_URI)
-  .then(() => {
-    console.log('MongoDB connected');
-    // Practical 10: register event listeners once, after DB is ready
-    registerListeners();
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-  })
-  .catch((err) => {
-    console.error('MongoDB connection error:', err.message);
-    process.exit(1);
-  });
+// Connect to MongoDB and start the server only when this file is executed
+// directly (node server.js), not when imported by Jest/Supertest.
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/taskmanager';
+
+  mongoose
+    .connect(MONGO_URI)
+    .then(() => {
+      console.log('MongoDB connected');
+      registerListeners();
+      app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    })
+    .catch((err) => {
+      console.error('MongoDB connection error:', err.message);
+      process.exit(1);
+    });
+}
